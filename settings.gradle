@@ -1,2 +1,2 @@
-rootProject.name = "statefulLiveData"
+rootProject.name = "stateful_livedata"
 include ":stateful.livedata"
