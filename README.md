@@ -1,7 +1,8 @@
 # StatefulLiveData
 辅助android开发者在中间层向view层传递数据和状态的LiveData，可扩展普通的LiveData为StatefulLiveData。
 
-# 当前最新版本号：[![](https://jitpack.io/v/cn.numeron/statefulLiveData.svg)](https://jitpack.io/#cn.numeron/statefulLiveData)
+# 当前最新版本号：[![](https://jitpack.io/v/cn.numeron/stateful.livedata.svg)](https://jitpack.io/#cn.numeron/stateful.livedata)
+
 
 ### 特性
 * 辅助android开发者在中间层向view层传递数据和状态的LiveData。
