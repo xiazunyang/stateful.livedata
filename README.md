@@ -1,0 +1,2 @@
+# statefulLivedata
+辅助android开发者在中间层向view层传递数据和状态的LiveData，可扩展普通的LiveData为StatefulLiveData。
