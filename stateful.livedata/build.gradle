@@ -34,8 +34,7 @@ android {
 }
 
 dependencies {
-    compileOnly "androidx.lifecycle:lifecycle-livedata-ktx:2.3.1"
-    compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlin_version"
-    api 'cn.numeron:android.common:1.0.2'
     api 'cn.numeron:common:1.0.5'
+    api 'cn.numeron:android.common:1.0.3'
+    api "androidx.lifecycle:lifecycle-livedata-ktx:2.3.1"
 }
