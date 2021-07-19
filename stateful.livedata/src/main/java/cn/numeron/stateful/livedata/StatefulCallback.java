@@ -1,7 +1,5 @@
 package cn.numeron.stateful.livedata;
 
-import cn.numeron.common.State;
-
 import org.jetbrains.annotations.NotNull;
 
 public interface StatefulCallback<T> {
@@ -16,9 +14,6 @@ public interface StatefulCallback<T> {
     }
 
     default void onMessage(@NotNull String message) {
-    }
-
-    default void onStateChanged(@NotNull State state) {
     }
 
 }

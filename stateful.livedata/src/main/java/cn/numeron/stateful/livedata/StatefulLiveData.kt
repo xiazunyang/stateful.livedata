@@ -1,10 +1,11 @@
 package cn.numeron.stateful.livedata
 
-import android.os.Looper
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.Observer
-import cn.numeron.common.State
+import com.numeron.android.MainThreadExecutor
+import java.util.*
 
 class StatefulLiveData<T> @JvmOverloads constructor(
         private val loading: String = "正在加载",
@@ -20,12 +21,35 @@ class StatefulLiveData<T> @JvmOverloads constructor(
         @JvmName("requireValue")
         get() = value!!
 
+    private val observers = LinkedList<StatefulObserver<*>>()
+
     constructor(value: T) : this() {
-        setValue(Stateful(State.Success, value))
+        setValue(Stateful(value = value, emptyMessage = empty))
     }
 
     override fun getValue(): Stateful<T> {
-        return super.getValue() ?: Stateful(State.Empty)
+        return super.getValue() ?: Stateful(value = null, emptyMessage = empty)
+    }
+
+    override fun observe(owner: LifecycleOwner, observer: Observer<in Stateful<T>>) {
+        super.observe(owner, observer)
+        if (observer is StatefulObserver<*>) {
+            observers.add(observer)
+        }
+    }
+
+    override fun observeForever(observer: Observer<in Stateful<T>>) {
+        super.observeForever(observer)
+        if (observer is StatefulObserver<*>) {
+            observers.add(observer)
+        }
+    }
+
+    override fun removeObserver(observer: Observer<in Stateful<T>>) {
+        super.removeObserver(observer)
+        if (observer is StatefulObserver<*>) {
+            observers.remove(observer)
+        }
     }
 
     fun postLoading(progress: Float) {
@@ -34,15 +58,34 @@ class StatefulLiveData<T> @JvmOverloads constructor(
 
     @JvmOverloads
     fun postLoading(message: String = this.loading, progress: Float = -1f) {
-        postValue(getValue().copy(state = State.Loading, progress = progress, message = message))
+        if (MainThreadExecutor.isMainThread) {
+            observers.map(StatefulObserver<*>::callback)
+                    .forEach {
+                        it.onLoading(message, progress)
+                    }
+        } else {
+            MainThreadExecutor.execute {
+                postLoading(message, progress)
+            }
+        }
     }
 
     fun postSuccess(value: T) {
-        postValue(getValue().copy(state = State.Success, value = value))
+        postValue(getValue().copy(value = value))
     }
 
     fun postFailure(cause: Throwable, message: String = this.failure) {
-        postValue(getValue().copy(state = State.Failure, failure = cause, message = message))
+        if (MainThreadExecutor.isMainThread) {
+            observers
+                    .map(StatefulObserver<*>::callback)
+                    .forEach {
+                        it.onFailure(message, cause)
+                    }
+        } else {
+            MainThreadExecutor.execute {
+                postFailure(cause, message)
+            }
+        }
     }
 
     fun postFailure(cause: Throwable) {
@@ -50,21 +93,86 @@ class StatefulLiveData<T> @JvmOverloads constructor(
     }
 
     fun postMessage(message: String) {
-        postValue(getValue().copy(message = message, version = getValue().version + 1))
+        if (MainThreadExecutor.isMainThread) {
+            observers.map(StatefulObserver<*>::callback)
+                    .forEach {
+                        it.onMessage(message)
+                    }
+        } else {
+            MainThreadExecutor.execute {
+                postMessage(message)
+            }
+        }
     }
 
     fun postEmpty(message: String = empty) {
-        postValue(getValue().copy(state = State.Empty, message = message))
+        if (MainThreadExecutor.isMainThread) {
+            getValue().emptyMessage = message
+            observers.map(StatefulObserver<*>::callback)
+                    .forEach {
+                        it.onEmpty(message)
+                    }
+        } else {
+            MainThreadExecutor.execute {
+                postEmpty(message)
+            }
+        }
     }
 
-    @Synchronized
-    //使用同步锁，保证快速调用的顺序也是一致的
     override fun postValue(value: Stateful<T>) {
-        if (isMainThread) {
-            super.setValue(value)
+        if (MainThreadExecutor.isMainThread) {
+            setValue(value)
         } else {
-            super.postValue(value)
+            MainThreadExecutor.execute(PostRunnable(value))
         }
+    }
+
+    fun <R> map(function: (T) -> R): LiveData<R> {
+        return object : LiveData<R>(), Observer<Stateful<T>> {
+
+            override fun onActive() {
+                this@StatefulLiveData.observeForever(this)
+            }
+
+            override fun onInactive() {
+                this@StatefulLiveData.removeObserver(this)
+            }
+
+            override fun onChanged(statefulValue: Stateful<T>) {
+                val tValue = statefulValue.value ?: return
+                value = function(tValue)
+            }
+        }
+    }
+
+    fun <R> switchMap(function: (T) -> LiveData<R>): LiveData<R> {
+        return object : LiveData<R>(), Observer<Stateful<T>> {
+
+            private var rLiveData: LiveData<R>? = null
+
+            private val rObserver = Observer(::setValue)
+
+            override fun onActive() {
+                this@StatefulLiveData.observeForever(this)
+                rLiveData?.observeForever(rObserver)
+            }
+
+            override fun onInactive() {
+                rLiveData?.removeObserver(rObserver)
+                this@StatefulLiveData.removeObserver(this)
+            }
+
+            override fun onChanged(statefulValue: Stateful<T>) {
+                val tValue = statefulValue.value ?: return
+                rLiveData?.removeObserver(rObserver)
+                rLiveData = function(tValue)
+                rLiveData?.observeForever(rObserver)
+            }
+        }
+    }
+
+    private inner class PostRunnable(private val value: Stateful<T>) : Runnable {
+        override fun run() = setValue(value)
     }
 
     companion object {
@@ -84,9 +192,6 @@ class StatefulLiveData<T> @JvmOverloads constructor(
             statefulLiveData.addSource(this, observer)
             return statefulLiveData
         }
-
-        private val isMainThread: Boolean
-            get() = Looper.myLooper() == Looper.getMainLooper()
 
     }
 
