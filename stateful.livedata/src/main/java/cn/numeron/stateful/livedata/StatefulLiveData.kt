@@ -4,13 +4,13 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.Observer
-import com.numeron.android.MainThreadExecutor
+import com.numeron.android.AppRuntime
 import java.util.*
 
 class StatefulLiveData<T> @JvmOverloads constructor(
-        private val loading: String = "正在加载",
-        private val failure: String = "加载失败",
-        private val empty: String = "没有数据"
+    private val loadingMessage: String = "正在加载",
+    private val failureMessage: String = "加载失败",
+    private val emptyMessage: String = "没有数据"
 ) : MediatorLiveData<Stateful<T>>() {
 
     val value: T?
@@ -24,11 +24,11 @@ class StatefulLiveData<T> @JvmOverloads constructor(
     private val observers = LinkedList<StatefulObserver<*>>()
 
     constructor(value: T) : this() {
-        setValue(Stateful(value = value, emptyMessage = empty))
+        setValue(Stateful(value = value, emptyMessage = emptyMessage))
     }
 
     override fun getValue(): Stateful<T> {
-        return super.getValue() ?: Stateful(value = null, emptyMessage = empty)
+        return super.getValue() ?: Stateful(value = null, emptyMessage = emptyMessage)
     }
 
     override fun observe(owner: LifecycleOwner, observer: Observer<in Stateful<T>>) {
@@ -53,18 +53,18 @@ class StatefulLiveData<T> @JvmOverloads constructor(
     }
 
     fun postLoading(progress: Float) {
-        postLoading(this.loading, progress)
+        postLoading(this.loadingMessage, progress)
     }
 
     @JvmOverloads
-    fun postLoading(message: String = this.loading, progress: Float = -1f) {
-        if (MainThreadExecutor.isMainThread) {
+    fun postLoading(message: String = this.loadingMessage, progress: Float = -1f) {
+        if (AppRuntime.mainExecutor.isMainThread) {
             observers.map(StatefulObserver<*>::callback)
-                    .forEach {
-                        it.onLoading(message, progress)
-                    }
+                .forEach {
+                    it.onLoading(message, progress)
+                }
         } else {
-            MainThreadExecutor.execute {
+            AppRuntime.mainExecutor.execute {
                 postLoading(message, progress)
             }
         }
@@ -74,56 +74,56 @@ class StatefulLiveData<T> @JvmOverloads constructor(
         postValue(getValue().copy(value = value))
     }
 
-    fun postFailure(cause: Throwable, message: String = this.failure) {
-        if (MainThreadExecutor.isMainThread) {
+    fun postFailure(cause: Throwable, message: String = this.failureMessage) {
+        if (AppRuntime.mainExecutor.isMainThread) {
             observers
-                    .map(StatefulObserver<*>::callback)
-                    .forEach {
-                        it.onFailure(message, cause)
-                    }
+                .map(StatefulObserver<*>::callback)
+                .forEach {
+                    it.onFailure(message, cause)
+                }
         } else {
-            MainThreadExecutor.execute {
+            AppRuntime.mainExecutor.execute {
                 postFailure(cause, message)
             }
         }
     }
 
     fun postFailure(cause: Throwable) {
-        postFailure(cause, failure)
+        postFailure(cause, failureMessage)
     }
 
     fun postMessage(message: String) {
-        if (MainThreadExecutor.isMainThread) {
+        if (AppRuntime.mainExecutor.isMainThread) {
             observers.map(StatefulObserver<*>::callback)
-                    .forEach {
-                        it.onMessage(message)
-                    }
+                .forEach {
+                    it.onMessage(message)
+                }
         } else {
-            MainThreadExecutor.execute {
+            AppRuntime.mainExecutor.execute {
                 postMessage(message)
             }
         }
     }
 
-    fun postEmpty(message: String = empty) {
-        if (MainThreadExecutor.isMainThread) {
+    fun postEmpty(message: String = emptyMessage) {
+        if (AppRuntime.mainExecutor.isMainThread) {
             getValue().emptyMessage = message
             observers.map(StatefulObserver<*>::callback)
-                    .forEach {
-                        it.onEmpty(message)
-                    }
+                .forEach {
+                    it.onEmpty(message)
+                }
         } else {
-            MainThreadExecutor.execute {
+            AppRuntime.mainExecutor.execute {
                 postEmpty(message)
             }
         }
     }
 
     override fun postValue(value: Stateful<T>) {
-        if (MainThreadExecutor.isMainThread) {
+        if (AppRuntime.mainExecutor.isMainThread) {
             setValue(value)
         } else {
-            MainThreadExecutor.execute(PostRunnable(value))
+            AppRuntime.mainExecutor.execute(PostRunnable(value))
         }
     }
 
@@ -178,10 +178,11 @@ class StatefulLiveData<T> @JvmOverloads constructor(
     companion object {
 
         fun <T> LiveData<T>.toStateful(
-                loading: String = "正在加载",
-                failure: String = "加载失败",
-                empty: String = "没有数据"): StatefulLiveData<T> {
-            val statefulLiveData = StatefulLiveData<T>(loading, failure, empty)
+            loadingMessage: String = "正在加载",
+            failureMessage: String = "加载失败",
+            emptyMessage: String = "没有数据"
+        ): StatefulLiveData<T> {
+            val statefulLiveData = StatefulLiveData<T>(loadingMessage, failureMessage, emptyMessage)
             val observer = Observer<T?> {
                 if (it == null) {
                     statefulLiveData.postEmpty()
