@@ -4,14 +4,10 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.Observer
-import com.numeron.android.AppRuntime
+import cn.numeron.android.AppRuntime
 import java.util.*
 
-class StatefulLiveData<T> @JvmOverloads constructor(
-    private val loadingMessage: String = "正在加载",
-    private val failureMessage: String = "加载失败",
-    private val emptyMessage: String = "没有数据"
-) : MediatorLiveData<Stateful<T>>() {
+class StatefulLiveData<T> @JvmOverloads constructor(value: T? = null) : MediatorLiveData<Stateful<T>>() {
 
     val value: T?
         @JvmName("value")
@@ -21,10 +17,17 @@ class StatefulLiveData<T> @JvmOverloads constructor(
         @JvmName("requireValue")
         get() = value!!
 
+    private val emptyMessage: String
+    private val loadingMessage: String
+    private val failureMessage: String
     private val observers = LinkedList<StatefulObserver<*>>()
 
-    constructor(value: T) : this() {
-        setValue(Stateful(value = value, emptyMessage = emptyMessage))
+    init {
+        val context = AppRuntime.context
+        emptyMessage = context.getString(R.string.stateful_empty_message)
+        loadingMessage = context.getString(R.string.stateful_loading_message)
+        failureMessage = context.getString(R.string.stateful_failure_message)
+        setValue(Stateful(value, emptyMessage))
     }
 
     override fun getValue(): Stateful<T> {
@@ -173,27 +176,6 @@ class StatefulLiveData<T> @JvmOverloads constructor(
 
     private inner class PostRunnable(private val value: Stateful<T>) : Runnable {
         override fun run() = setValue(value)
-    }
-
-    companion object {
-
-        fun <T> LiveData<T>.toStateful(
-            loadingMessage: String = "正在加载",
-            failureMessage: String = "加载失败",
-            emptyMessage: String = "没有数据"
-        ): StatefulLiveData<T> {
-            val statefulLiveData = StatefulLiveData<T>(loadingMessage, failureMessage, emptyMessage)
-            val observer = Observer<T?> {
-                if (it == null) {
-                    statefulLiveData.postEmpty()
-                } else {
-                    statefulLiveData.postSuccess(it)
-                }
-            }
-            statefulLiveData.addSource(this, observer)
-            return statefulLiveData
-        }
-
     }
 
 }

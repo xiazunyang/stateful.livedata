@@ -34,7 +34,6 @@ android {
 }
 
 dependencies {
-    api 'cn.numeron:common:1.0.5'
-    api 'cn.numeron:android.common:1.0.3'
+    api 'cn.numeron:android.common:1.0.5'
     api "androidx.lifecycle:lifecycle-livedata-ktx:2.3.1"
 }

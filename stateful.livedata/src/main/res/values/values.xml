@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stateful_empty_message">No data was loaded.</string>
+    <string name="stateful_failure_message">Data load failure.</string>
+    <string name="stateful_loading_message">Loading data&#46;&#46;&#46;</string>
+</resources>
