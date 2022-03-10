@@ -1,13 +1,13 @@
 package cn.numeron.stateful.livedata
 
+import androidx.annotation.CallSuper
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.Observer
 import cn.numeron.android.AppRuntime
 import java.util.*
 
-class StatefulLiveData<T> @JvmOverloads constructor(value: T? = null) : MediatorLiveData<Stateful<T>>() {
+open class StatefulLiveData<T> @JvmOverloads constructor(value: T? = null) : MediatorLiveData<Stateful<T>>() {
 
     val value: T?
         @JvmName("value")
@@ -30,10 +30,15 @@ class StatefulLiveData<T> @JvmOverloads constructor(value: T? = null) : Mediator
         setValue(Stateful(value, emptyMessage))
     }
 
-    override fun getValue(): Stateful<T> {
+    final override fun setValue(value: Stateful<T>?) {
+        super.setValue(value)
+    }
+
+    final override fun getValue(): Stateful<T> {
         return super.getValue() ?: Stateful(value = null, emptyMessage = emptyMessage)
     }
 
+    @CallSuper
     override fun observe(owner: LifecycleOwner, observer: Observer<in Stateful<T>>) {
         super.observe(owner, observer)
         if (observer is StatefulObserver<*>) {
@@ -41,6 +46,7 @@ class StatefulLiveData<T> @JvmOverloads constructor(value: T? = null) : Mediator
         }
     }
 
+    @CallSuper
     override fun observeForever(observer: Observer<in Stateful<T>>) {
         super.observeForever(observer)
         if (observer is StatefulObserver<*>) {
@@ -48,6 +54,7 @@ class StatefulLiveData<T> @JvmOverloads constructor(value: T? = null) : Mediator
         }
     }
 
+    @CallSuper
     override fun removeObserver(observer: Observer<in Stateful<T>>) {
         super.removeObserver(observer)
         if (observer is StatefulObserver<*>) {
@@ -122,55 +129,11 @@ class StatefulLiveData<T> @JvmOverloads constructor(value: T? = null) : Mediator
         }
     }
 
-    override fun postValue(value: Stateful<T>) {
+    final override fun postValue(value: Stateful<T>) {
         if (AppRuntime.mainExecutor.isMainThread) {
             setValue(value)
         } else {
             AppRuntime.mainExecutor.execute(PostRunnable(value))
-        }
-    }
-
-    fun <R> map(function: (T) -> R): LiveData<R> {
-        return object : LiveData<R>(), Observer<Stateful<T>> {
-
-            override fun onActive() {
-                this@StatefulLiveData.observeForever(this)
-            }
-
-            override fun onInactive() {
-                this@StatefulLiveData.removeObserver(this)
-            }
-
-            override fun onChanged(statefulValue: Stateful<T>) {
-                val tValue = statefulValue.value ?: return
-                value = function(tValue)
-            }
-        }
-    }
-
-    fun <R> switchMap(function: (T) -> LiveData<R>): LiveData<R> {
-        return object : LiveData<R>(), Observer<Stateful<T>> {
-
-            private var rLiveData: LiveData<R>? = null
-
-            private val rObserver = Observer(::setValue)
-
-            override fun onActive() {
-                this@StatefulLiveData.observeForever(this)
-                rLiveData?.observeForever(rObserver)
-            }
-
-            override fun onInactive() {
-                rLiveData?.removeObserver(rObserver)
-                this@StatefulLiveData.removeObserver(this)
-            }
-
-            override fun onChanged(statefulValue: Stateful<T>) {
-                val tValue = statefulValue.value ?: return
-                rLiveData?.removeObserver(rObserver)
-                rLiveData = function(tValue)
-                rLiveData?.observeForever(rObserver)
-            }
         }
     }
 
